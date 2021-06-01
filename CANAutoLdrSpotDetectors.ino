@@ -161,7 +161,7 @@ void setupCBUS()
 
 #ifdef PRINT_INFO
   Serial << F("> mode = ") << ((config.FLiM) ? "FLiM" : "SLiM") << F(", CANID = ") << config.CANID;
-  Serial << F(", NN = ") << config.nodeNum << endl;
+  Serial << F(", NN = ") << config.nodeNum << F(", ModuleId = ") << MODULE_ID << endl;
 
   // show code version and copyright notice
   printConfig();
@@ -216,14 +216,19 @@ void setup()
   setupModule();
 
   // end of setup
-#ifdef PRINT_INFO
-  Serial << F("> ready") << endl << endl;
-#endif
+  DEBUG_PRINT(F("> ready") << endl);
 }
 
-
-void loop()
+unsigned long lastRunTime = millis();
+void runDetectorsTimely()
 {
+  unsigned long now = millis();
+  if (now - lastRunTime < INTERVAL)
+  {
+    return;
+  }
+  lastRunTime = now;
+  
   detectors.update();
 #ifdef PLOT_DETAILS
   detectors.plotDetailed(2);
@@ -231,6 +236,11 @@ void loop()
 #ifdef PLOT_ALL_VALUES
   detectors.plotAll();
 #endif
+}
+
+void loop()
+{
+  runDetectorsTimely();
 
   // do CBUS message, switch and LED processing
   CBUS.process();
@@ -251,13 +261,11 @@ bool sendEvent(byte opCode, unsigned int eventNo)
   msg.data[3] = highByte(eventNo);
   msg.data[4] = lowByte(eventNo);
 
-#ifdef PRINT_INFO
   if (CBUS.sendMessage(&msg)) {
-    Serial << F("> sent CBUS message with Event Number ") << eventNo << endl;
+    DEBUG_PRINT(F("> sent CBUS message with Event Number ") << eventNo);
   } else {
-    Serial << F("> error sending CBUS message") << endl;
+    DEBUG_PRINT(F("> error sending CBUS message"));
   }
-#endif
 }
 
 //
@@ -270,9 +278,7 @@ void eventhandler(byte index, CANFrame *msg)
   byte ev;
   byte evval;
 
-#ifdef DEBUG
-  Serial << F("> event handler: index = ") << index << F(", opcode = 0x") << _HEX(opc) << endl;
-#endif
+  DEBUG_PRINT(F("> event handler: index = ") << index << F(", opcode = 0x") << _HEX(opc));
 
   switch (opc) {
 
