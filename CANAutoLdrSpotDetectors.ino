@@ -273,6 +273,7 @@ void reportStatus()
   detectors.allLdrs([](LDR & ldr){ 
     int index = &ldr - detectors.getLdrs();
     cbusEventEmitter.onChange(index, ldr.state == COVERED);
+    delay(20); // Reduce impact of SOD storm.
   });
 }
 
@@ -430,7 +431,7 @@ void processSerialInput(void)
       case 'r':
         // renegotiate
         CBUS.renegotiate();
-        DEBUG_PRINT()"Renegotiation done.");
+        DEBUG_PRINT("Renegotiation done.");
         break;
 
       case 'z':
