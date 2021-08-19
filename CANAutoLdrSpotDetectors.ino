@@ -76,7 +76,7 @@
 
 // Tuning parameters
 const int INTERVAL = 100; // ms
-const float P = 0.050f;  // for moving average
+const float P = 0.1f;  // for moving average
 const int THRESHOLD = 150;
 
 // 3rd party libraries
@@ -96,8 +96,8 @@ unsigned char mname[7] = { 'A', 'L', 'D', 'R' };
 
 // constants
 const byte VER_MAJ = 1;         // code major version
-const char VER_MIN = ' ';       // code minor version
-const byte VER_BETA = 0;        // code beta sub-version
+const char VER_MIN = 'a';       // code minor version
+const byte VER_BETA = 1;        // code beta sub-version
 const byte MODULE_ID = 147;      // CBUS module type
 
 const unsigned long CAN_OSC_FREQ = 8000000;     // Oscillator frequency on the CAN2515 board
@@ -152,7 +152,7 @@ void setupCBUS()
   config.EE_NUM_NVS = 0;
   config.EE_EVENTS_START = 50;
   config.EE_MAX_EVENTS = 64;
-  config.EE_NUM_EVS = 0;
+  config.EE_NUM_EVS = 1;
   config.EE_BYTES_PER_EVENT = (config.EE_NUM_EVS + 4);
 
   // initialise and load configuration
@@ -262,10 +262,18 @@ bool sendEvent(byte opCode, unsigned int eventNo)
   msg.data[4] = lowByte(eventNo);
 
   if (CBUS.sendMessage(&msg)) {
-    DEBUG_PRINT(F("> sent CBUS message with Event Number ") << eventNo);
+    DEBUG_PRINT(F("> sent CBUS message with Event Number ") << eventNo << F(" opCode ") << opCode);
   } else {
     DEBUG_PRINT(F("> error sending CBUS message"));
   }
+}
+
+void reportStatus()
+{
+  detectors.allLdrs([](LDR & ldr){ 
+    int index = &ldr - detectors.getLdrs();
+    cbusEventEmitter.onChange(index, ldr.state == COVERED);
+  });
 }
 
 //
@@ -282,10 +290,15 @@ void eventhandler(byte index, CANFrame *msg)
 
   switch (opc) {
 
-    case OPC_ACON:
-    case OPC_ASON:
-        //evval = config.getEventEVval(index, ev);
-        // TODO: Send current status events for each LDR.
+    case OPC_ACON: case OPC_ACOF:
+    case OPC_ASON: case OPC_ASOF:
+      // Send current status events for each LDR.
+      evval = config.getEventEVval(index, 1);
+      DEBUG_PRINT(">  event variable=" << evval);
+      if (evval == 1)
+      {
+        reportStatus();
+      }
 
       break;
   }
@@ -299,7 +312,7 @@ void printConfig(void)
   Serial << F("> compiled on ") << __DATE__ << F(" at ") << __TIME__ << F(", compiler ver = ") << __cplusplus << endl;
 
   // copyright
-  Serial << F("> © Martin Da Costa (MERG M6223) 2020") << endl;
+  Serial << F("> © Sven Rosvall (MERG M3337) 2021") << endl;
 }
 
 //
@@ -417,6 +430,7 @@ void processSerialInput(void)
       case 'r':
         // renegotiate
         CBUS.renegotiate();
+        DEBUG_PRINT()"Renegotiation done.");
         break;
 
       case 'z':
