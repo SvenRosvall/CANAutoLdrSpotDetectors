@@ -162,9 +162,6 @@ void setupCBUS()
 #ifdef PRINT_INFO
   Serial << F("> mode = ") << ((config.FLiM) ? "FLiM" : "SLiM") << F(", CANID = ") << config.CANID;
   Serial << F(", NN = ") << config.nodeNum << F(", ModuleId = ") << MODULE_ID << endl;
-
-  // show code version and copyright notice
-  printConfig();
 #endif
 
   // set module parameters
@@ -202,7 +199,6 @@ void setupModule()
 #ifdef PLOT_ALL_VALUES
   detectors.plotTitleAll();
 #endif
-
 }
 
 void setup()
@@ -210,10 +206,14 @@ void setup()
   Serial.begin (115200);
 #ifdef PRINT_INFO
   Serial << endl << endl << F("> ** CANALDR v1 ** ") << __FILE__ << endl;
+  // show code version and copyright notice
+  printConfig();
 #endif
 
   setupCBUS();
+  //Serial << "CBUS is set up OK" << endl;
   setupModule();
+  //Serial << "ALDR module set up OK" << endl;
 
   // end of setup
   DEBUG_PRINT(F("> ready") << endl);
@@ -231,7 +231,7 @@ void runDetectorsTimely()
   
   detectors.update();
 #ifdef PLOT_DETAILS
-  detectors.plotDetailed(2);
+  detectors.plotDetailed(1);
 #endif
 #ifdef PLOT_ALL_VALUES
   detectors.plotAll();
@@ -270,8 +270,10 @@ bool sendEvent(byte opCode, unsigned int eventNo)
 
 void reportStatus()
 {
+  DEBUG_PRINT("Reporting status");
   detectors.allLdrs([](LDR & ldr){ 
     int index = &ldr - detectors.getLdrs();
+    DEBUG_PRINT("Reporting status for LDR " << index);
     cbusEventEmitter.onChange(index, ldr.state == COVERED);
     delay(20); // Reduce impact of SOD storm.
   });
@@ -322,88 +324,26 @@ void printConfig(void)
 
 void processSerialInput(void)
 {
-  byte uev = 0;
-  char msgstr[32];
-
   if (Serial.available()) {
     char c = Serial.read();
+    //Serial << "Received input command: " << c << endl;
 
     switch (c) {
 
       case 'n':
-        // node config
-        printConfig();
-
-        // node identity
-        Serial << F("> CBUS node configuration") << endl;
-        Serial << F("> mode = ") << (config.FLiM ? "FLiM" : "SLiM") << F(", CANID = ") << config.CANID << F(", node number = ") << config.nodeNum << endl;
-        Serial << endl;
+        printNodeConfig();
         break;
 
       case 'e':
-        // EEPROM learned event data table
-        Serial << F("> stored events ") << endl;
-        Serial << F("  max events = ") << config.EE_MAX_EVENTS << F(" EVs per event = ") << config.EE_NUM_EVS << F(" bytes per event = ") << config.EE_BYTES_PER_EVENT << endl;
-
-        for (byte j = 0; j < config.EE_MAX_EVENTS; j++) {
-          if (config.getEvTableEntry(j) != 0) {
-            ++uev;
-          }
-        }
-
-        Serial << F("  stored events = ") << uev << F(", free = ") << (config.EE_MAX_EVENTS - uev) << endl;
-        Serial << F("  using ") << (uev * config.EE_BYTES_PER_EVENT) << F(" of ") << (config.EE_MAX_EVENTS * config.EE_BYTES_PER_EVENT) << F(" bytes") << endl << endl;
-
-        Serial << F("  Ev#  |  NNhi |  NNlo |  ENhi |  ENlo | ");
-
-        for (byte j = 0; j < (config.EE_NUM_EVS); j++) {
-          sprintf(msgstr, "EV%03d | ", j + 1);
-          Serial << msgstr;
-        }
-
-        Serial << F("Hash |") << endl;
-
-        Serial << F(" --------------------------------------------------------------") << endl;
-
-        // for each event data line
-        for (byte j = 0; j < config.EE_MAX_EVENTS; j++) {
-          if (config.getEvTableEntry(j) != 0) {
-            sprintf(msgstr, "  %03d  | ", j);
-            Serial << msgstr;
-
-            // for each data byte of this event
-            for (byte e = 0; e < (config.EE_NUM_EVS + 4); e++) {
-              sprintf(msgstr, " 0x%02hx | ", config.readEEPROM(config.EE_EVENTS_START + (j * config.EE_BYTES_PER_EVENT) + e));
-              Serial << msgstr;
-            }
-
-            sprintf(msgstr, "%4d |", config.getEvTableEntry(j));
-            Serial << msgstr << endl;
-          }
-        }
-
-        Serial << endl;
-
+        printEvents();
         break;
 
       // NVs
       case 'v':
-        // note NVs number from 1, not 0
-        Serial << "> Node variables" << endl;
-        Serial << F("   NV   Val") << endl;
-        Serial << F("  --------------------") << endl;
-
-        for (byte j = 1; j <= config.EE_NUM_NVS; j++) {
-          byte v = config.readNV(j);
-          sprintf(msgstr, " - %02d : %3hd | 0x%02hx", j, v, v);
-          Serial << msgstr << endl;
-        }
-
-        Serial << endl << endl;
-
+        printNodeVariables();
         break;
 
-      // CAN bus status
+      // CAN bus statusc
       case 'c':
         CBUS.printStatus();
         break;
@@ -435,34 +375,123 @@ void processSerialInput(void)
         break;
 
       case 'z':
-        // Reset module, clear EEPROM
-        static bool ResetRq = false;
-        static unsigned long ResWaitTime;
-        if (!ResetRq) {
-          // start timeout timer
-          Serial << F(">Reset & EEPROM wipe requested. Press 'z' again within 2 secs to confirm") << endl;
-          ResWaitTime = millis();
-          ResetRq = true;
-        }
-        else {
-          // This is a confirmed request
-          // 2 sec timeout
-          if (ResetRq && ((millis() - ResWaitTime) > 2000)) {
-            Serial << F(">timeout expired, reset not performed") << endl;
-            ResetRq = false;
-          }
-          else {
-            //Request confirmed within timeout
-            Serial << F(">RESETTING AND WIPING EEPROM") << endl;
-            config.resetModule();
-            ResetRq = false;
-          }
-        }
+        resetModule();
+        break;
+
+      case '\r': case '\n':
         break;
 
       default:
-        // Serial << F("> unknown command ") << c << endl;
+        Serial << F("> unknown command ") << c << endl;
         break;
+    }
+    //Serial << "Command processed" << endl;
+  }
+  //Serial << "Serial processing done" << endl;
+}
+
+void printNodeConfig()
+{
+  // node config
+  printConfig();
+
+  // node identity
+  Serial << F("> CBUS node configuration") << endl;
+  Serial << F("> mode = ") << (config.FLiM ? "FLiM" : "SLiM") << F(", CANID = ") << config.CANID << F(", node number = ") << config.nodeNum << endl;
+  Serial << endl;
+}
+
+void printEvents()
+{
+  // EEPROM learned event data table
+
+  char msgstr[32];
+  byte uev = 0;
+
+  Serial << F("> stored events ") << endl;
+  Serial << F("  max events = ") << config.EE_MAX_EVENTS << F(" EVs per event = ") << config.EE_NUM_EVS << F(" bytes per event = ") << config.EE_BYTES_PER_EVENT << endl;
+
+  for (byte j = 0; j < config.EE_MAX_EVENTS; j++) {
+    if (config.getEvTableEntry(j) != 0) {
+      ++uev;
+    }
+  }
+
+  Serial << F("  stored events = ") << uev << F(", free = ") << (config.EE_MAX_EVENTS - uev) << endl;
+  Serial << F("  using ") << (uev * config.EE_BYTES_PER_EVENT) << F(" of ") << (config.EE_MAX_EVENTS * config.EE_BYTES_PER_EVENT) << F(" bytes") << endl << endl;
+
+  Serial << F("  Ev#  |  NNhi |  NNlo |  ENhi |  ENlo | ");
+
+  for (byte j = 0; j < (config.EE_NUM_EVS); j++) {
+    sprintf(msgstr, "EV%03d | ", j + 1);
+    Serial << msgstr;
+  }
+
+  Serial << F("Hash |") << endl;
+
+  Serial << F(" --------------------------------------------------------------") << endl;
+
+  // for each event data line
+  for (byte j = 0; j < config.EE_MAX_EVENTS; j++) {
+    if (config.getEvTableEntry(j) != 0) {
+      sprintf(msgstr, "  %03d  | ", j);
+      Serial << msgstr;
+
+      // for each data byte of this event
+      for (byte e = 0; e < (config.EE_NUM_EVS + 4); e++) {
+        sprintf(msgstr, " 0x%02hx | ", config.readEEPROM(config.EE_EVENTS_START + (j * config.EE_BYTES_PER_EVENT) + e));
+        Serial << msgstr;
+      }
+
+      sprintf(msgstr, "%4d |", config.getEvTableEntry(j));
+      Serial << msgstr << endl;
+    }
+  }
+
+  Serial << endl;
+}
+
+void printNodeVariables()
+{
+  // note NVs number from 1, not 0
+  char msgstr[32];
+
+  Serial << "> Node variables" << endl;
+  Serial << F("   NV   Val") << endl;
+  Serial << F("  --------------------") << endl;
+
+  for (byte j = 1; j <= config.EE_NUM_NVS; j++) {
+    byte v = config.readNV(j);
+    sprintf(msgstr, " - %02d : %3hd | 0x%02hx", j, v, v);
+    Serial << msgstr << endl;
+  }
+
+  Serial << endl << endl;
+}
+
+void resetModule()
+{
+  // Reset module, clear EEPROM
+  static bool ResetRq = false;
+  static unsigned long ResWaitTime;
+  if (!ResetRq) {
+    // start timeout timer
+    Serial << F(">Reset & EEPROM wipe requested. Press 'z' again within 2 secs to confirm") << endl;
+    ResWaitTime = millis();
+    ResetRq = true;
+  }
+  else {
+    // This is a confirmed request
+    // 2 sec timeout
+    if (ResetRq && ((millis() - ResWaitTime) > 2000)) {
+      Serial << F(">timeout expired, reset not performed") << endl;
+      ResetRq = false;
+    }
+    else {
+      //Request confirmed within timeout
+      Serial << F(">RESETTING AND WIPING EEPROM") << endl;
+      config.resetModule();
+      ResetRq = false;
     }
   }
 }
