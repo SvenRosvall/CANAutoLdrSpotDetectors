@@ -79,6 +79,8 @@ const int INTERVAL = 100; // ms
 const float P = 0.1f;  // for moving average
 const int THRESHOLD = 150;
 
+const int SOD_INTERVAL = 20; // ms
+
 // 3rd party libraries
 #include <Streaming.h>
 #include <AutoLdrSpotDetectors.h>
@@ -129,6 +131,15 @@ CbusEventEmitter cbusEventEmitter;
 // Using 5 LDR sensors.
 AutoLdrSpotDetectors detectors(cbusEventEmitter, {A0, A1, A2, A3, A4});
 
+const int GLOBAL_EVS = 1;        // Number event variables for the module
+    // EV1 - StartOfDay
+
+// Variables for SOD state reporting event dispatching.
+// They indicate which switch (index of) to report next and at what time to send the next event.
+// An index of -1 indicates that there is no SOD reporting going on.
+int nextSodLdrIndex = -1;
+unsigned int nextSodMessageTime = 0;
+
 //////////////////////////////////////////////////////////////////////////
 
 //CBUS pins
@@ -152,7 +163,7 @@ void setupCBUS()
   config.EE_NUM_NVS = 0;
   config.EE_EVENTS_START = 50;
   config.EE_MAX_EVENTS = 64;
-  config.EE_NUM_EVS = 1;
+  config.EE_NUM_EVS = GLOBAL_EVS;
   config.EE_BYTES_PER_EVENT = (config.EE_NUM_EVS + 4);
 
   // initialise and load configuration
@@ -163,6 +174,9 @@ void setupCBUS()
   Serial << F("> mode = ") << ((config.FLiM) ? "FLiM" : "SLiM") << F(", CANID = ") << config.CANID;
   Serial << F(", NN = ") << config.nodeNum << F(", ModuleId = ") << MODULE_ID << endl;
 #endif
+
+  // show code version and copyright notice
+  printConfig();
 
   // set module parameters
   CBUSParams params(config);
@@ -206,8 +220,6 @@ void setup()
   Serial.begin (115200);
 #ifdef PRINT_INFO
   Serial << endl << endl << F("> ** CANALDR v1 ** ") << __FILE__ << endl;
-  // show code version and copyright notice
-  printConfig();
 #endif
 
   setupCBUS();
@@ -247,6 +259,8 @@ void loop()
 
   // process console commands
   processSerialInput();
+
+  processStartOfDay();
 }
 
 // Send an event routine according to Module Switch
@@ -263,20 +277,11 @@ bool sendEvent(byte opCode, unsigned int eventNo)
 
   if (CBUS.sendMessage(&msg)) {
     DEBUG_PRINT(F("> sent CBUS message with Event Number ") << eventNo << F(" opCode ") << opCode);
+    return true;
   } else {
     DEBUG_PRINT(F("> error sending CBUS message"));
+    return false;
   }
-}
-
-void reportStatus()
-{
-  DEBUG_PRINT("Reporting status");
-  detectors.allLdrs([](LDR & ldr){ 
-    int index = &ldr - detectors.getLdrs();
-    DEBUG_PRINT("Reporting status for LDR " << index);
-    cbusEventEmitter.onChange(index, ldr.state == COVERED);
-    delay(20); // Reduce impact of SOD storm.
-  });
 }
 
 //
@@ -286,27 +291,47 @@ void reportStatus()
 void eventhandler(byte index, CANFrame *msg)
 {
   byte opc = msg->data[0];
-  byte ev;
-  byte evval;
 
   DEBUG_PRINT(F("> event handler: index = ") << index << F(", opcode = 0x") << _HEX(opc));
+  DEBUG_PRINT(F("> event handler: length = ") << msg->len);
 
-  switch (opc) {
-
-    case OPC_ACON: case OPC_ACOF:
-    case OPC_ASON: case OPC_ASOF:
+  switch (opc)
+  {
+    case OPC_ACON:
+    case OPC_ASON:
       // Send current status events for each LDR.
-      evval = config.getEventEVval(index, 1);
+      byte evval = config.getEventEVval(index, 1);
       DEBUG_PRINT(">  event variable=" << evval);
-      if (evval == 1)
+      if (evval == 1 && nextSodLdrIndex < 0) // Check if a SOD is already in progress.
       {
-        reportStatus();
+        nextSodLdrIndex = 0;
+        nextSodMessageTime = millis() + SOD_INTERVAL;
       }
 
       break;
   }
 }
 
+void processStartOfDay()
+{
+  if (nextSodLdrIndex >= 0
+      && nextSodMessageTime < millis())
+  {
+    byte opCode = detectors.getLdrs()[nextSodLdrIndex].isCovered() ? OPC_ACON : OPC_ACOF;
+    sendEvent(opCode, (unsigned int) nextSodLdrIndex + 1);
+
+    if (++nextSodLdrIndex >= detectors.getLdrCount())
+    {
+      DEBUG_PRINT(F("> Done all SOD events."));
+      nextSodLdrIndex = -1;
+    }
+    else
+    {
+      DEBUG_PRINT(F("> Prepare for next SOD event."));
+      nextSodMessageTime = millis() + SOD_INTERVAL;
+    }
+  }
+}
 
 void printConfig(void)
 {
