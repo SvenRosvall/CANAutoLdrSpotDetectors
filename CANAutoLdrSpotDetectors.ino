@@ -83,7 +83,7 @@ const int SOD_INTERVAL = 20; // ms
 
 // 3rd party libraries
 #include <Streaming.h>
-#include <AutoLdrSpotDetectors.h>
+#include <MovingAverageDetectors.h>
 
 // CBUS library header files
 #include <CBUS2515.h>            // CAN controller and CBUS class
@@ -129,7 +129,7 @@ void CbusEventEmitter::onChange(int ldrIndex, bool covered)
 // module objects
 CbusEventEmitter cbusEventEmitter;
 // Using 5 LDR sensors.
-AutoLdrSpotDetectors detectors(cbusEventEmitter, {A0, A1, A2, A3, A4});
+MovingAverageDetectors detectors(cbusEventEmitter, {A0, A1, A2, A3, A4});
 
 const int GLOBAL_EVS = 1;        // Number event variables for the module
     // EV1 - StartOfDay
