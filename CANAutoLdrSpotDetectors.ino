@@ -69,6 +69,8 @@
 // Digital / Analog pin 5     LDR input
 //////////////////////////////////////////////////////////////////////////
 
+#include <initializer_list.h>
+
 // Choose what algorithm to use.
 //#define ADJUSTING_DETECTORS
 //#define MOVING_AVERAGE_DETECTORS
@@ -78,6 +80,8 @@
 //#define PLOT_ALL_VALUES
 //#define PLOT_DETAILS
 //#define DEBUG       // set for serial debug
+
+auto LED_PINS = {A0, A1, A2, A3, A4};
 
 // Tuning parameters
 const int INTERVAL = 100; // ms
@@ -148,13 +152,13 @@ CbusEventEmitter cbusEventEmitter;
 // Using 5 LDR sensors.
 #ifdef ADJUSTING_DETECTORS
 // Julian Coles' algorithm:
-AdjustingDetectors detectors(cbusEventEmitter, {A0, A1, A2, A3, A4}, 250);
+AdjustingDetectors detectors(cbusEventEmitter, LED_PINS, 250);
 #endif
 #ifdef MOVING_AVERAGE_DETECTORS
-MovingAverageDetectors detectors(cbusEventEmitter, {A0, A1, A2, A3, A4});
+MovingAverageDetectors detectors(cbusEventEmitter, LED_PINS);
 #endif
 #ifdef GROUP_MOVING_AVERAGE_DETECTORS
-GroupMovingAverageDetectors detectors(cbusEventEmitter, {A0, A1, A2, A3, A4});
+GroupMovingAverageDetectors detectors(cbusEventEmitter, LED_PINS);
 #endif
 
 const int GLOBAL_EVS = 1;        // Number event variables for the module
