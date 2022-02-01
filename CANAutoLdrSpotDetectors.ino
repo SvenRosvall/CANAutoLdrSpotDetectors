@@ -69,6 +69,11 @@
 // Digital / Analog pin 5     LDR input
 //////////////////////////////////////////////////////////////////////////
 
+// Choose what algorithm to use.
+//#define ADJUSTING_DETECTORS
+//#define MOVING_AVERAGE_DETECTORS
+#define GROUP_MOVING_AVERAGE_DETECTORS
+
 // Choose what set of output is wanted.
 //#define PLOT_ALL_VALUES
 //#define PLOT_DETAILS
@@ -77,13 +82,25 @@
 // Tuning parameters
 const int INTERVAL = 100; // ms
 const float P = 0.1f;  // for moving average
-const int THRESHOLD = 150;
+const int THRESHOLD_LEVEL = 150;
+// Parameters for GroupMovingAverage algorithm.
+const float Q = 0.2f;  // for moving diff average
+const float SelfDiffRatio = 0.3f; // How much to weigh in own LDR vs all LDRs
+const int CHANGE_INTERVAL = 500; // ms
 
 const int SOD_INTERVAL = 20; // ms
 
 // 3rd party libraries
 #include <Streaming.h>
+#ifdef ADJUSTING_DETECTORS
+#include <AdjustingDetectors.h>
+#endif
+#ifdef MOVING_AVERAGE_DETECTORS
 #include <MovingAverageDetectors.h>
+#endif
+#ifdef GROUP_MOVING_AVERAGE_DETECTORS
+#include <GroupMovingAverageDetectors.h>
+#endif
 
 // CBUS library header files
 #include <CBUS2515.h>            // CAN controller and CBUS class
@@ -129,7 +146,16 @@ void CbusEventEmitter::onChange(int ldrIndex, bool covered)
 // module objects
 CbusEventEmitter cbusEventEmitter;
 // Using 5 LDR sensors.
+#ifdef ADJUSTING_DETECTORS
+// Julian Coles' algorithm:
+AdjustingDetectors detectors(cbusEventEmitter, {A0, A1, A2, A3, A4}, 250);
+#endif
+#ifdef MOVING_AVERAGE_DETECTORS
 MovingAverageDetectors detectors(cbusEventEmitter, {A0, A1, A2, A3, A4});
+#endif
+#ifdef GROUP_MOVING_AVERAGE_DETECTORS
+GroupMovingAverageDetectors detectors(cbusEventEmitter, {A0, A1, A2, A3, A4});
+#endif
 
 const int GLOBAL_EVS = 1;        // Number event variables for the module
     // EV1 - StartOfDay
@@ -204,9 +230,19 @@ void setupCBUS()
 
 void setupModule()
 {
+#ifdef MOVING_AVERAGE_DETECTORS
   detectors.setMovingAverageP(P);
-  detectors.setThresholdLevel(THRESHOLD);
+  detectors.setThresholdLevel(THRESHOLD_LEVEL);
+#endif
+#ifdef GROUP_MOVING_AVERAGE_DETECTORS
+  detectors.setMovingAverageP(P);
+  detectors.setMovingDiffAverageP(Q);
+  detectors.setSelfDiffRatio(SelfDiffRatio);
+  detectors.setChangeInterval(CHANGE_INTERVAL);
+  detectors.setThresholdLevel(THRESHOLD_LEVEL);
+#endif
   detectors.setup();
+
 #ifdef PLOT_DETAILS
   detectors.plotTitleDetailed(2);
 #endif
