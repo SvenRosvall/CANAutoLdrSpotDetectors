@@ -79,7 +79,7 @@
 // Choose what set of output is wanted.
 //#define PLOT_ALL_VALUES
 //#define PLOT_DETAILS
-//#define DEBUG       // set for serial debug
+//#define PRINT_DEBUG       // set for serial debug
 
 auto LED_PINS = {A0, A1, A2, A3, A4};
 
@@ -125,10 +125,10 @@ const byte MODULE_ID = 147;      // CBUS module type
 
 const unsigned long CAN_OSC_FREQ = 8000000;     // Oscillator frequency on the CAN2515 board
 
-#ifdef DEBUG
-#define DEBUG_PRINT(S) Serial << S << endl
+#ifdef PRINT_DEBUG
+#define DEBUG(S) Serial << S << endl
 #else
-#define DEBUG_PRINT(S)
+#define DEBUG(S)
 #endif
 #if !defined(PLOT_ALL_VALUES) && !defined(PLOT_DETAILS)
 #define PRINT_INFO
@@ -206,7 +206,9 @@ void setupCBUS()
 #endif
 
   // show code version and copyright notice
+#ifdef PRINT_INFO
   printConfig();
+#endif
 
   // set module parameters
   CBUSParams params(config);
@@ -248,7 +250,7 @@ void setupModule()
   detectors.setup();
 
 #ifdef PLOT_DETAILS
-  detectors.plotTitleDetailed(2);
+  detectors.plotTitleDetailed(1);
 #endif
 #ifdef PLOT_ALL_VALUES
   detectors.plotTitleAll();
@@ -268,7 +270,7 @@ void setup()
   //Serial << "ALDR module set up OK" << endl;
 
   // end of setup
-  DEBUG_PRINT(F("> ready") << endl);
+  DEBUG(F("> ready") << endl);
 }
 
 unsigned long lastRunTime = millis();
@@ -316,10 +318,10 @@ bool sendEvent(byte opCode, unsigned int eventNo)
   msg.data[4] = lowByte(eventNo);
 
   if (CBUS.sendMessage(&msg)) {
-    DEBUG_PRINT(F("> sent CBUS message with Event Number ") << eventNo << F(" opCode ") << opCode);
+    DEBUG(F("> sent CBUS message with Event Number ") << eventNo << F(" opCode ") << opCode);
     return true;
   } else {
-    DEBUG_PRINT(F("> error sending CBUS message"));
+    DEBUG(F("> error sending CBUS message"));
     return false;
   }
 }
@@ -332,8 +334,8 @@ void eventhandler(byte index, CANFrame *msg)
 {
   byte opc = msg->data[0];
 
-  DEBUG_PRINT(F("> event handler: index = ") << index << F(", opcode = 0x") << _HEX(opc));
-  DEBUG_PRINT(F("> event handler: length = ") << msg->len);
+  DEBUG(F("> event handler: index = ") << index << F(", opcode = 0x") << _HEX(opc));
+  DEBUG(F("> event handler: length = ") << msg->len);
 
   switch (opc)
   {
@@ -341,7 +343,7 @@ void eventhandler(byte index, CANFrame *msg)
     case OPC_ASON:
       // Send current status events for each LDR.
       byte evval = config.getEventEVval(index, 1);
-      DEBUG_PRINT(">  event variable=" << evval);
+      DEBUG(">  event variable=" << evval);
       if (evval == 1 && nextSodLdrIndex < 0) // Check if a SOD is already in progress.
       {
         nextSodLdrIndex = 0;
@@ -362,12 +364,12 @@ void processStartOfDay()
 
     if (++nextSodLdrIndex >= detectors.getLdrCount())
     {
-      DEBUG_PRINT(F("> Done all SOD events."));
+      DEBUG(F("> Done all SOD events."));
       nextSodLdrIndex = -1;
     }
     else
     {
-      DEBUG_PRINT(F("> Prepare for next SOD event."));
+      DEBUG(F("> Prepare for next SOD event."));
       nextSodMessageTime = millis() + SOD_INTERVAL;
     }
   }
@@ -436,7 +438,7 @@ void processSerialInput(void)
       case 'r':
         // renegotiate
         CBUS.renegotiate();
-        DEBUG_PRINT("Renegotiation done.");
+        DEBUG("Renegotiation done.");
         break;
 
       case 'z':
