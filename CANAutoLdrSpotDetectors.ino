@@ -78,18 +78,18 @@
 
 // Choose what set of output is wanted.
 //#define PLOT_ALL_VALUES
-//#define PLOT_DETAILS
+//#define PLOT_DETAILS 3
 //#define PRINT_DEBUG       // set for serial debug
 
 auto LED_PINS = {A0, A1, A2, A3, A4};
 
 // Tuning parameters
 const int INTERVAL = 50; // ms
-const float P = 0.1f;  // for moving average
-const int THRESHOLD_LEVEL = 150;
+const float P = 0.05f;  // for moving average
+const int THRESHOLD_LEVEL = 270;
 // Parameters for GroupMovingAverage algorithm.
 const float Q = 0.2f;  // for moving diff average
-const float SelfDiffRatio = 0.1f; // How much to weigh in own LDR vs all LDRs
+const float SelfDiffRatio = 0.8f; // How much to weigh in own LDR vs all LDRs
 const int CHANGE_INTERVAL = 200; // ms
 
 const int SOD_INTERVAL = 20; // ms
@@ -250,7 +250,7 @@ void setupModule()
   detectors.setup();
 
 #ifdef PLOT_DETAILS
-  detectors.plotTitleDetailed(1);
+  detectors.plotTitleDetailed(PLOT_DETAILS);
 #endif
 #ifdef PLOT_ALL_VALUES
   detectors.plotTitleAll();
@@ -285,7 +285,7 @@ void runDetectorsTimely()
   
   detectors.update();
 #ifdef PLOT_DETAILS
-  detectors.plotDetailed(1);
+  detectors.plotDetailed(PLOT_DETAILS);
 #endif
 #ifdef PLOT_ALL_VALUES
   detectors.plotAll();
