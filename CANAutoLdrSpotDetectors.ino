@@ -90,7 +90,8 @@ const int THRESHOLD_LEVEL = 270;
 // Parameters for GroupMovingAverage algorithm.
 const float Q = 0.2f;  // for moving diff average
 const float SelfDiffRatio = 0.8f; // How much to weigh in own LDR vs all LDRs
-const int CHANGE_INTERVAL = 200; // ms
+const int CHANGE_COVER_INTERVAL = 200; // ms
+const int CHANGE_OPEN_INTERVAL = 400; // ms
 
 const int SOD_INTERVAL = 20; // ms
 
@@ -244,7 +245,8 @@ void setupModule()
   detectors.setMovingAverageP(P);
   detectors.setMovingDiffAverageP(Q);
   detectors.setSelfDiffRatio(SelfDiffRatio);
-  detectors.setChangeInterval(CHANGE_INTERVAL);
+  detectors.setChangeCoverInterval(CHANGE_COVER_INTERVAL);
+  detectors.setChangeOpenInterval(CHANGE_OPEN_INTERVAL);
   detectors.setThresholdLevel(THRESHOLD_LEVEL);
 #endif
   detectors.setup();
