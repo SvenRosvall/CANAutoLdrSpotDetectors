@@ -85,8 +85,8 @@ auto LED_PINS = {A0, A1, A2, A3, A4};
 
 // Tuning parameters
 const int INTERVAL = 50; // ms
-const float P = 0.05f;  // for moving average
-const int THRESHOLD_LEVEL = 270;
+const float P = 0.02f;  // for moving average
+const int THRESHOLD_LEVEL = 200;
 // Parameters for GroupMovingAverage algorithm.
 const float Q = 0.2f;  // for moving diff average
 const float SelfDiffRatio = 0.8f; // How much to weigh in own LDR vs all LDRs
