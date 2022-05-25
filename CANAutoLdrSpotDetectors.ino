@@ -92,6 +92,7 @@ const float Q = 0.2f;  // for moving diff average
 const float SelfDiffRatio = 0.8f; // How much to weigh in own LDR vs all LDRs
 const int CHANGE_COVER_INTERVAL = 200; // ms
 const int CHANGE_OPEN_INTERVAL = 400; // ms
+const float S = 0.8; // How much to take scaling into account. 1.0 => totally. 0.0 => Use threshold level as is.
 
 const int SOD_INTERVAL = 20; // ms
 
@@ -120,7 +121,7 @@ unsigned char mname[7] = { 'A', 'L', 'D', 'R' };
 
 // constants
 const byte VER_MAJ = 1;         // code major version
-const char VER_MIN = 'a';       // code minor version
+const char VER_MIN = 'b';       // code minor version
 const byte VER_BETA = 1;        // code beta sub-version
 const byte MODULE_ID = 147;      // CBUS module type
 
@@ -162,6 +163,17 @@ MovingAverageDetectors detectors(cbusEventEmitter, LED_PINS);
 GroupMovingAverageDetectors detectors(cbusEventEmitter, LED_PINS);
 #endif
 
+const int GLOBAL_NODE_VARIABLES = 10;
+    // NV1 - INTERVAL between updates. (X * 10ms)
+    // NV2 - THRESHOLD_LEVEL (X * 4)
+    // NV3 - P (X / 100)
+    // NV4 - Q (X / 100)
+    // NV5 - SelfDiffRatio (X / 100)
+    // NC6 - COVER_INTERVAL (X * 10ms)
+    // NC7 - OPEN_INTERVAL (X * 10ms)
+    // NC8 - S (X / 100) // Scaling threshold depending on light level
+    // NC9 - StartOfDay message interval (X ms)
+
 const int GLOBAL_EVS = 1;        // Number event variables for the module
     // EV1 - StartOfDay
 
@@ -184,6 +196,87 @@ const byte CAN_CS_PIN = 10;
 CBUS2515 CBUS;                      // CBUS object
 CBUSConfig config;                  // configuration object
 
+unsigned int getINTERVAL()
+{
+  byte b = config.readNV(1);
+  if (b == 255) return INTERVAL;
+  return b * 10; // ms
+}
+
+int getTHRESHOLD_LEVEL()
+{
+  byte b = config.readNV(2);
+  if (b == 255) return THRESHOLD_LEVEL;
+  return b * 4;
+}
+
+float getP()
+{
+  byte b = config.readNV(3);
+  if (b == 255) return P;
+  return b / 100.0f;
+}
+
+float getQ()
+{
+  byte b = config.readNV(4);
+  if (b == 255) return Q;
+  return b / 100.0f;
+}
+
+float getSelfDiffRatio()
+{
+  byte b = config.readNV(5);
+  if (b == 255) return SelfDiffRatio;
+  return b / 100.0f;
+}
+
+int getCOVER_INTERVAL()
+{
+  byte b = config.readNV(6);
+  if (b == 255) return CHANGE_COVER_INTERVAL;
+  return b * 10; // ms
+}
+
+int getOPEN_INTERVAL()
+{
+  byte b = config.readNV(7);
+  if (b == 255) return CHANGE_OPEN_INTERVAL;
+  return b * 10; // ms
+}
+
+float getS()
+{
+  byte b = config.readNV(8);
+  if (b == 255) return S;
+  return b / 100.0f;
+}
+
+int getSOD_INTERVAL()
+{
+  byte b = config.readNV(9);
+  if (b == 255) return SOD_INTERVAL;
+  return b; // ms
+}
+
+
+template <typename D>
+void setDetectorNVs(D & detectors)
+{
+#ifdef MOVING_AVERAGE_DETECTORS
+  detectors.setMovingAverageP(getP());
+  detectors.setThresholdLevel(getTHRESHOLD_LEVEL());
+#endif
+#ifdef GROUP_MOVING_AVERAGE_DETECTORS
+  detectors.setMovingAverageP(getP());
+  detectors.setMovingDiffAverageP(getQ());
+  detectors.setSelfDiffRatio(getSelfDiffRatio());
+  detectors.setChangeCoverInterval(getCOVER_INTERVAL());
+  detectors.setChangeOpenInterval(getOPEN_INTERVAL());
+  detectors.setThresholdLevel(getTHRESHOLD_LEVEL());
+#endif
+}
+
 //
 ///  setup CBUS - runs once at power on called from setup()
 //
@@ -191,7 +284,7 @@ void setupCBUS()
 {
   // set config layout parameters
   config.EE_NVS_START = 10;
-  config.EE_NUM_NVS = 0;
+  config.EE_NUM_NVS = GLOBAL_NODE_VARIABLES;
   config.EE_EVENTS_START = 50;
   config.EE_MAX_EVENTS = 64;
   config.EE_NUM_EVS = GLOBAL_EVS;
@@ -237,18 +330,7 @@ void setupCBUS()
 
 void setupModule()
 {
-#ifdef MOVING_AVERAGE_DETECTORS
-  detectors.setMovingAverageP(P);
-  detectors.setThresholdLevel(THRESHOLD_LEVEL);
-#endif
-#ifdef GROUP_MOVING_AVERAGE_DETECTORS
-  detectors.setMovingAverageP(P);
-  detectors.setMovingDiffAverageP(Q);
-  detectors.setSelfDiffRatio(SelfDiffRatio);
-  detectors.setChangeCoverInterval(CHANGE_COVER_INTERVAL);
-  detectors.setChangeOpenInterval(CHANGE_OPEN_INTERVAL);
-  detectors.setThresholdLevel(THRESHOLD_LEVEL);
-#endif
+  setDetectorNVs(detectors);
   detectors.setup();
 
 #ifdef PLOT_DETAILS
@@ -279,18 +361,23 @@ unsigned long lastRunTime = millis();
 void runDetectorsTimely()
 {
   unsigned long now = millis();
-  if (now - lastRunTime < INTERVAL)
+  if (now - lastRunTime < getINTERVAL())
   {
     return;
   }
   lastRunTime = now;
-  
+
+  setDetectorNVs(detectors);
   detectors.update();
 #ifdef PLOT_DETAILS
   detectors.plotDetailed(PLOT_DETAILS);
 #endif
 #ifdef PLOT_ALL_VALUES
   detectors.plotAll();
+#endif
+#ifdef PRINT_DEBUG
+  now = millis();
+  DEBUG(F("> Run took ") << now - lastRunTime << F(" ms"));
 #endif
 }
 
@@ -349,7 +436,7 @@ void eventhandler(byte index, CANFrame *msg)
       if (evval == 1 && nextSodLdrIndex < 0) // Check if a SOD is already in progress.
       {
         nextSodLdrIndex = 0;
-        nextSodMessageTime = millis() + SOD_INTERVAL;
+        nextSodMessageTime = millis() + getSOD_INTERVAL();
       }
 
       break;
@@ -372,7 +459,7 @@ void processStartOfDay()
     else
     {
       DEBUG(F("> Prepare for next SOD event."));
-      nextSodMessageTime = millis() + SOD_INTERVAL;
+      nextSodMessageTime = millis() + getSOD_INTERVAL();
     }
   }
 }
