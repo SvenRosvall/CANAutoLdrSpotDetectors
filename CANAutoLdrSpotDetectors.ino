@@ -81,6 +81,7 @@
 //#define PLOT_DETAILS 3
 //#define PRINT_DEBUG       // set for serial debug
 
+// Define the pins that are connected to LDRs:
 auto LED_PINS = {A0, A1, A2, A3, A4};
 
 // Tuning parameters
