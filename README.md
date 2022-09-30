@@ -74,6 +74,7 @@ module will not work if this number does not match the oscillator frequency.
 ### CBUS Op Codes
 
 The following Op codes are supported:
+
 OP_CODE | HEX | Function
 ----------|---------|---------
  OPC_ACON | 0x90 | On event
