@@ -246,7 +246,7 @@ int getOPEN_INTERVAL()
   return b * 10; // ms
 }
 
-float getS()
+float getThresholdScaling()
 {
   byte b = config.readNV(8);
   if (b == 255) return S;
@@ -275,6 +275,7 @@ void setDetectorNVs(D & detectors)
   detectors.setChangeCoverInterval(getCOVER_INTERVAL());
   detectors.setChangeOpenInterval(getOPEN_INTERVAL());
   detectors.setThresholdLevel(getTHRESHOLD_LEVEL());
+  detectors.setThresholdScaling(getThresholdScaling());
 #endif
 }
 
