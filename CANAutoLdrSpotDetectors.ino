@@ -78,8 +78,8 @@
 
 // Choose what set of output is wanted.
 //#define PLOT_ALL_VALUES
-//#define PLOT_DETAILS 3
-//#define PRINT_DEBUG       // set for serial debug
+//#define PLOT_DETAILS 4      // Zero based
+#define PRINT_DEBUG       // set for serial debug
 
 // Define the pins that are connected to LDRs:
 auto LED_PINS = {A0, A1, A2, A3, A4};
@@ -409,11 +409,20 @@ bool sendEvent(byte opCode, unsigned int eventNo)
   msg.data[4] = lowByte(eventNo);
 
   if (CBUS.sendMessage(&msg)) {
-    DEBUG(F("> sent CBUS message with Event Number ") << eventNo << F(" opCode ") << opCode);
+    DEBUG(F("> sent CBUS message with Event Number ") << eventNo << F(" opCode ") << opCode
+      << F(" CAN Error register=") << _WIDTHZ(_HEX(CBUS.canp->errorFlagRegister()), 2));
     return true;
   } else {
-    DEBUG(F("> error sending CBUS message"));
-    return false;
+    DEBUG(F("> error sending CBUS message. CAN Error register=") << _WIDTHZ(_HEX(CBUS.canp->errorFlagRegister()), 2));
+    DEBUG(F("> Retrying..."));
+    if (CBUS.sendMessage(&msg)) {
+      DEBUG(F("> re-sent CBUS message with Event Number ") << eventNo << F(" opCode ") << opCode
+        << F("CAN Error register=") << _WIDTHZ(_HEX(CBUS.canp->errorFlagRegister()), 2));
+      return true;
+    } else {
+      DEBUG(F("> error sending CBUS message. CAN Error register=") << _WIDTHZ(_HEX(CBUS.canp->errorFlagRegister()), 2));
+      return false;
+    }
   }
 }
 
