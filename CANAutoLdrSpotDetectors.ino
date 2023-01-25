@@ -107,6 +107,7 @@ const int SOD_INTERVAL = 20; // ms
 #endif
 #ifdef GROUP_MOVING_AVERAGE_DETECTORS
 #include <IntegrationStateDecider.h>
+#include <BucketPinReader.h>
 #include <GroupMovingAverageDetectors.h>
 #endif
 
@@ -163,7 +164,7 @@ MovingAverageDetectors detectors(cbusEventEmitter, LED_PINS);
 #endif
 #ifdef GROUP_MOVING_AVERAGE_DETECTORS
 IntegrationStateDecider::Factory deciderFactory;
-GroupMovingAverageDetectors detectors(cbusEventEmitter, LED_PINS, deciderFactory);
+GroupMovingAverageDetectors detectors(cbusEventEmitter, LED_PINS, deciderFactory, createBucketPinReader());
 #endif
 
 const int GLOBAL_NODE_VARIABLES = 10;
