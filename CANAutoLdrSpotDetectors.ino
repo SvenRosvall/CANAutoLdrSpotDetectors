@@ -77,9 +77,9 @@
 #define GROUP_MOVING_AVERAGE_DETECTORS
 
 // Choose what set of output is wanted.
-//#define PLOT_ALL_VALUES
+#define PLOT_ALL_VALUES
 //#define PLOT_DETAILS 4      // Zero based
-#define PRINT_DEBUG       // set for serial debug
+//#define PRINT_DEBUG       // set for serial debug
 
 // Define the pins that are connected to LDRs:
 auto LED_PINS = {A0, A1, A2, A3, A4};
@@ -106,6 +106,7 @@ const int SOD_INTERVAL = 20; // ms
 #include <MovingAverageDetectors.h>
 #endif
 #ifdef GROUP_MOVING_AVERAGE_DETECTORS
+#include <IntegrationStateDecider.h>
 #include <GroupMovingAverageDetectors.h>
 #endif
 
@@ -161,7 +162,8 @@ AdjustingDetectors detectors(cbusEventEmitter, LED_PINS, 250);
 MovingAverageDetectors detectors(cbusEventEmitter, LED_PINS);
 #endif
 #ifdef GROUP_MOVING_AVERAGE_DETECTORS
-GroupMovingAverageDetectors detectors(cbusEventEmitter, LED_PINS);
+IntegrationStateDecider::Factory deciderFactory;
+GroupMovingAverageDetectors detectors(cbusEventEmitter, LED_PINS, deciderFactory);
 #endif
 
 const int GLOBAL_NODE_VARIABLES = 10;
@@ -272,8 +274,8 @@ void setDetectorNVs(D & detectors)
   detectors.setMovingAverageP(getP());
   detectors.setMovingDiffAverageP(getQ());
   detectors.setSelfDiffRatio(getSelfDiffRatio());
-  detectors.setChangeCoverInterval(getCOVER_INTERVAL());
-  detectors.setChangeOpenInterval(getOPEN_INTERVAL());
+//  detectors.setChangeCoverInterval(getCOVER_INTERVAL());
+//  detectors.setChangeOpenInterval(getOPEN_INTERVAL());
   detectors.setThresholdLevel(getTHRESHOLD_LEVEL());
   detectors.setThresholdScaling(getThresholdScaling());
 #endif
