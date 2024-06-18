@@ -106,7 +106,7 @@ NV Index | Description | Value use | default value
  6 | Time to change state when LDR is getting covered. | * 10ms | 20 (=200ms)
  7 | Time to change state when LDR is getting opened. | * 10ms | 40 (=400ms)
  8 | Scaling of threshold levels depending on ambient light levels. 0% => Use threshold level as is; 100% => scales fully. |  / 100 (i.e. a percentage) | 80 (=80%)
- 9 | How often to send out events as response to StartOfDay events.
+ 9 | How often to send out events as response to StartOfDay events.| * 1ms | 20 (=20ms)
  10 | Reserved for future uses
  
 ## Set Up and the Serial Monitor
@@ -149,7 +149,6 @@ This character will reboot the module.
 #### 'm'
 This character will return the amount of free memory. 
  
- 
- 
- 
- 
+## TODO
+* Review how NodeVariables are updated. Is it OK to read NVs every iteration or is caching needed.
+  Maybe use a callback from CBUS library when a NV is updated.
